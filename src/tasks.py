@@ -20,21 +20,19 @@ from openrelik_worker_common.task_utils import create_task_result, get_input_fil
 from .app import celery
 
 # Task name used to register and route the task to the correct queue.
-TASK_NAME = "your-worker-package-name.tasks.your_task_name"
+TASK_NAME = "openrelik-worker-unzip.tasks.unzip"
 
 # Task metadata for registration in the core system.
 TASK_METADATA = {
-    "display_name": "<REPLACE_WITH_NAME_OF_THE_WORKER>",
-    "description": "<REPLACE_WITH_DESCRIPTION_OF_THE_WORKER>",
+    "display_name": "Unzip",
+    "description": "Extract files from a Zip Archive",
     # Configuration that will be rendered as a web for in the UI, and any data entered
     # by the user will be available to the task function when executing (task_config).
     "task_config": [
         {
-            "name": "<REPLACE_WITH_NAME>",
-            "label": "<REPLACE_WITH_LABEL>",
-            "description": "<REPLACE_WITH_DESCRIPTION>",
-            "type": "<REPLACE_WITH_TYPE>",  # Types supported: text, textarea, checkbox
-            "required": False,
+            "name": "Zip Extraction",
+            "label": "Zippy",
+            "description": "Extract files from Zip Archives",
         },
     ],
 }
@@ -49,7 +47,7 @@ def command(
     workflow_id: str = None,
     task_config: dict = None,
 ) -> str:
-    """Run <REPLACE_WITH_COMMAND> on input files.
+    """Run unzip on input files.
 
     Args:
         pipe_result: Base64-encoded result from the previous Celery task, if any.
@@ -63,26 +61,33 @@ def command(
     """
     input_files = get_input_files(pipe_result, input_files or [])
     output_files = []
-    base_command = ["<REPLACE_WITH_COMMAND>"]
+    base_command = ["unzip"]
     base_command_string = " ".join(base_command)
 
     for input_file in input_files:
-        output_file = create_output_file(
-            output_path,
-            display_name=input_file.get("display_name"),
-            extension="<REPLACE_WITH_FILE_EXTENSION>",
-            data_type="<[OPTIONAL]_REPLACE_WITH_DATA_TYPE>",
-        )
-        command = base_command + [input_file.get("path")]
+        zip_path = input_file.get("path")
+        if not zip_path or not zip_path.lower().endswith(".zip"):
+            raise RuntimeError(f"Invalid input file: {zip_path}")
+        
+        # Construct command
+        command = base_command + [zip_path, "-d", output_path]
+        
+        try:
+            subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(f"Unzip failed for {zip_path}: {e.stderr.decode().strip()}")
 
-        # Run the command
-        with open(output_file.path, "w") as fh:
-            subprocess.Popen(command, stdout=fh)
-
-        output_files.append(output_file.to_dict())
-
+    # Collect all extracted files
+    for root, _, files in os.walk(output_path):
+        for file_name in files:
+            file_path = os.path.join(root, file_name)
+            output_files.append(
+                create_output_file(
+                    output_path, display_name=file_name, extension=file_name.split(".")[-1], data_type="extracted"
+                ).to_dict()
+            )
     if not output_files:
-        raise RuntimeError("<REPLACE_WITH_ERROR_STRING>")
+        raise RuntimeError("No files were extracted from the archive.")
 
     return create_task_result(
         output_files=output_files,
