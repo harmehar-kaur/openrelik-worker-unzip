@@ -1,33 +1,21 @@
-# Copyright 2024 Google LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#    https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
+import os
 import subprocess
+import time
+import shutil
+
+from pathlib import Path
+from uuid import uuid4
 
 from openrelik_worker_common.file_utils import create_output_file
 from openrelik_worker_common.task_utils import create_task_result, get_input_files
 
 from .app import celery
 
-# Task name used to register and route the task to the correct queue.
 TASK_NAME = "openrelik-worker-unzip.tasks.unzip"
 
-# Task metadata for registration in the core system.
 TASK_METADATA = {
     "display_name": "Unzip",
     "description": "Extract files from a Zip Archive",
-    # Configuration that will be rendered as a web for in the UI, and any data entered
-    # by the user will be available to the task function when executing (task_config).
     "task_config": [
         {
             "name": "Zip Extraction",
@@ -36,7 +24,6 @@ TASK_METADATA = {
         },
     ],
 }
-
 
 @celery.task(bind=True, name=TASK_NAME, metadata=TASK_METADATA)
 def command(
@@ -61,37 +48,55 @@ def command(
     """
     input_files = get_input_files(pipe_result, input_files or [])
     output_files = []
-    base_command = ["unzip"]
-    base_command_string = " ".join(base_command)
 
     for input_file in input_files:
-        zip_path = input_file.get("path")
-        if not zip_path or not zip_path.lower().endswith(".zip"):
-            raise RuntimeError(f"Invalid input file: {zip_path}")
-        
-        # Construct command
-        command = base_command + [zip_path, "-d", output_path]
-        
-        try:
-            subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        except subprocess.CalledProcessError as e:
-            raise RuntimeError(f"Unzip failed for {zip_path}: {e.stderr.decode().strip()}")
+        input_file_display_name = input_file.get("display_name")
+        log_file = create_output_file(
+            output_path,
+            display_name=f"{input_file_display_name}-unzip.log",
+        )
 
-    # Collect all extracted files
-    for root, _, files in os.walk(output_path):
-        for file_name in files:
-            file_path = os.path.join(root, file_name)
-            output_files.append(
-                create_output_file(
-                    output_path, display_name=file_name, extension=file_name.split(".")[-1], data_type="extracted"
-                ).to_dict()
-            )
+        extract_directory = os.path.join(output_path, uuid4().hex)
+        os.mkdir(extract_directory)
+
+        command = [
+            "unzip",
+            "-o",
+            input_file.get("path"),
+            "-d",
+            extract_directory,
+        ]
+        command_string = " ".join(command[:5])
+
+        process = subprocess.Popen(command)
+        while process.poll() is None:
+            self.send_event("task-progress")
+            time.sleep(1)
+
+    if os.path.isfile(log_file.path) and os.stat(log_file.path).st_size > 0:
+        output_files.append(log_file.to_dict())
+
+    extract_directory_path = Path(extract_directory)
+    extracted_files = [f for f in extract_directory_path.glob("**/*") if f.is_file()]
+    for file in extracted_files:
+        original_path = str(file.relative_to(extract_directory_path))
+        output_file = create_output_file(
+            output_path,
+            display_name=file.name,
+            original_path=original_path,
+            data_type="worker:openrelik:extraction:unzip",
+            source_file_id=input_file.get("id"),
+        )
+        os.rename(file.absolute(), output_file.path)
+        output_files.append(output_file.to_dict())
+
+    shutil.rmtree(extract_directory)
+
     if not output_files:
-        raise RuntimeError("No files were extracted from the archive.")
+        raise RuntimeError("Unzip didn't create any output files")
 
     return create_task_result(
         output_files=output_files,
         workflow_id=workflow_id,
-        command=command,
-        meta={},
+        command=command_string,
     )
