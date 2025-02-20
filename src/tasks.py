@@ -92,6 +92,6 @@ def command(
     return create_task_result(
         output_files=output_files,
         workflow_id=workflow_id,
-        command=base_command_string,
+        command=command,
         meta={},
     )
