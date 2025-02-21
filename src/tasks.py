@@ -79,19 +79,21 @@ def command(
     extract_directory_path = Path(extract_directory)
     extracted_files = [f for f in extract_directory_path.glob("**/*") if f.is_file()]
     for file in extracted_files:
-        original_path = str(file.relative_to(extract_directory_path))
-        output_file = create_output_file(
-            output_path,
-            display_name=file.name,
-            original_path=original_path,
-            data_type="worker:openrelik:extraction:unzip",
-            source_file_id=input_file.get("id"),
-        )
-        os.rename(file.absolute(), output_file.path)
-        output_files.append(output_file.to_dict())
+        relative_path = file.relative_to(extract_directory_path)  # Keep folder structure
+        destination_path = os.path.join(output_path, relative_path)
 
-    shutil.rmtree(extract_directory)
+        os.makedirs(os.path.dirname(destination_path), exist_ok=True)  # Ensure parent dirs exist
+        shutil.move(file, destination_path)  # Move extracted file to correct structure
 
+    output_file = create_output_file(
+        output_path,
+        display_name=file.name,
+        original_path=str(relative_path),
+        data_type="worker:openrelik:extraction:unzip",
+        source_file_id=input_file.get("id"),
+    )
+
+    output_files.append(output_file.to_dict())
     if not output_files:
         raise RuntimeError("Unzip didn't create any output files")
 
