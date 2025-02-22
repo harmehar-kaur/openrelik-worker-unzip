@@ -78,7 +78,7 @@ def command(
 
     extract_directory_path = Path(extract_directory)
     extracted_files = [f for f in extract_directory_path.glob("**/*") if f.is_file()]
-    for file in extracted_files: 
+    for file in extracted_files:
         original_path = str(file.relative_to(extract_directory_path))
         output_file = create_output_file(
             output_path,
