@@ -54,7 +54,7 @@ def command(
         os.makedirs(extract_directory, exist_ok=True)
 
         command = [
-            "/forensics/7zip/7zz", "x",
+            "/forensics/7zip/7zz", "e",
             input_file.get("path"),
             f"-o{extract_directory}",
             "-y"
