@@ -57,7 +57,8 @@ def command(
             "/forensics/7zip/7zz", "e",
             input_file.get("path"),
             f"-o{extract_directory}",
-            "-y"
+            "-y", 
+            "-aou"
         ]
         command_string = " ".join(command)
 
