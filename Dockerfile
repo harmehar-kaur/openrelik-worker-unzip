@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN wget https://www.7-zip.org/a/7z2409-linux-x64.tar.xz && \
     mkdir -p /forensics/7zip && \
     tar -xf 7z2409-linux-x64.tar.xz -C /forensics/7zip && \
+    chmod +x /forensics/7zip/7zz && \
     rm 7z2409-linux-x64.tar.xz
     
 # Configure poetry
