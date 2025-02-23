@@ -16,8 +16,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Download and extract 7-Zip, then move it to /forensics/
 RUN wget https://www.7-zip.org/a/7z2409-linux-x64.tar.xz && \
     mkdir -p /forensics/7zip && \
-    tar -xf 7z2301-linux-x64.tar.xz -C /forensics/7zip && \
-    rm 7z2301-linux-x64.tar.xz
+    tar -xf 7z2409-linux-x64.tar.xz -C /forensics/7zip && \
+    rm 7z2409-linux-x64.tar.xz
     
 # Configure poetry
 ENV POETRY_NO_INTERACTION=1 \
