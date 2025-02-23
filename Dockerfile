@@ -10,7 +10,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-poetry \
     wget \
     unzip \
+<<<<<<< HEAD
     xz-utils \
+=======
+    # Add your dependencies here
+>>>>>>> parent of e08813d (Update Dockerfile)
     && rm -rf /var/lib/apt/lists/*
 
 # Download and extract 7-Zip, then move it to /forensics/
