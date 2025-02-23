@@ -9,6 +9,7 @@ RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selectio
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-poetry \
     unzip \
+    p7zip-full -y \
     # Add your dependencies here
     && rm -rf /var/lib/apt/lists/*
 
