@@ -17,11 +17,6 @@ TASK_METADATA = {
     "display_name": "Unzip",
     "description": "Extract files from a Zip Archive",
     "task_config": [
-        {
-            "name": "Zip Extraction",
-            "label": "Zippy",
-            "description": "Extract files from Zip Archives",
-        },
     ],
 }
 
@@ -53,22 +48,21 @@ def command(
         input_file_display_name = input_file.get("display_name")
         log_file = create_output_file(
             output_path,
-            display_name=f"{input_file_display_name}-unzip.log",
+            display_name=f"{input_file_display_name}-7z.log",
         )
 
         extract_directory = os.path.join(output_path, uuid4().hex)
         os.mkdir(extract_directory)
 
         command = [
-            "unzip",
-            "-o",
+            "7z", "x",
             input_file.get("path"),
-            "-d",
-            extract_directory,
+            f"-o{extract_directory}",
+            "-y"
         ]
         command_string = " ".join(command[:5])
 
-        process = subprocess.Popen(command)
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         while process.poll() is None:
             self.send_event("task-progress")
             time.sleep(1)
@@ -95,7 +89,7 @@ def command(
 
     output_files.append(output_file.to_dict())
     if not output_files:
-        raise RuntimeError("Unzip didn't create any output files")
+        raise RuntimeError("7zip didn't create any output files")
 
     return create_task_result(
         output_files=output_files,
