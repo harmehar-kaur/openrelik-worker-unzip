@@ -55,7 +55,7 @@ def command(
         os.mkdir(extract_directory)
 
         command = [
-            "/forensics/7zz", "x",
+            "/forensics/7zip/7zz", "x",
             input_file.get("path"),
             f"-o{extract_directory}",
             "-y"
