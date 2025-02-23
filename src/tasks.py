@@ -15,9 +15,8 @@ TASK_NAME = "openrelik-worker-unzip.tasks.unzip"
 
 TASK_METADATA = {
     "display_name": "Unzip",
-    "description": "Extract files from a Zip Archive",
-    "task_config": [
-    ],
+    "description": "Extract files from a Zip Archive using 7-Zip",
+    "task_config": [],
 }
 
 @celery.task(bind=True, name=TASK_NAME, metadata=TASK_METADATA)
@@ -29,7 +28,7 @@ def command(
     workflow_id: str = None,
     task_config: dict = None,
 ) -> str:
-    """Run unzip on input files.
+    """Run 7-Zip extraction on input files.
 
     Args:
         pipe_result: Base64-encoded result from the previous Celery task, if any.
@@ -48,22 +47,22 @@ def command(
         input_file_display_name = input_file.get("display_name")
         log_file = create_output_file(
             output_path,
-            display_name=f"{input_file_display_name}-unzip.log",
+            display_name=f"{input_file_display_name}-7z.log",
         )
 
         extract_directory = os.path.join(output_path, uuid4().hex)
-        os.mkdir(extract_directory)
+        os.makedirs(extract_directory, exist_ok=True)
 
         command = [
-            "unzip",
-            "-o",
+            "/forensics/7zip/7zz", "e",
             input_file.get("path"),
-            "-d",
-            extract_directory,
+            f"-o{extract_directory}",
+            "-y", 
+            "-aou"
         ]
-        command_string = " ".join(command[:5])
+        command_string = " ".join(command)
 
-        process = subprocess.Popen(command)
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         while process.poll() is None:
             self.send_event("task-progress")
             time.sleep(1)
@@ -73,13 +72,14 @@ def command(
 
     extract_directory_path = Path(extract_directory)
     extracted_files = [f for f in extract_directory_path.glob("**/*") if f.is_file()]
+    
     for file in extracted_files:
         original_path = str(file.relative_to(extract_directory_path))
         output_file = create_output_file(
             output_path,
             display_name=file.name,
             original_path=original_path,
-            data_type="worker:openrelik:extraction:unzip",
+            data_type="worker:openrelik:extraction:7zip",
             source_file_id=input_file.get("id"),
         )
         os.rename(file.absolute(), output_file.path)
@@ -88,7 +88,7 @@ def command(
     shutil.rmtree(extract_directory)
 
     if not output_files:
-        raise RuntimeError("Unzip didn't create any output files")
+        raise RuntimeError("7-Zip didn't create any output files")
 
     return create_task_result(
         output_files=output_files,
